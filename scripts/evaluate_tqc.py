@@ -13,7 +13,10 @@ from stable_baselines3.common.vec_env import (
     VecNormalize,
 )
 
-from legible_motion.envs.multi_object import MultiObjectPickAndPlaceEnv
+from legible_motion.envs.multi_object import (
+    MultiObjectConfig,
+    MultiObjectPickAndPlaceEnv,
+)
 
 
 def main():
@@ -49,6 +52,12 @@ def main():
         type=str,
         default="auto",
     )
+    
+    parser.add_argument(
+        "--reward-type",
+        choices=["dense", "sparse"],
+        default="dense",
+    )
 
     args = parser.parse_args()
 
@@ -60,8 +69,12 @@ def main():
     # -----------------------------------------------------
 
     def make_env():
+        config = MultiObjectConfig(
+            reward_type=args.reward_type,
+        )
+
         return Monitor(
-            MultiObjectPickAndPlaceEnv(),
+            MultiObjectPickAndPlaceEnv(config=config),
             info_keywords=("is_success",),
         )
 
