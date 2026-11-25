@@ -228,16 +228,14 @@ class MultiObjectPickAndPlaceTask(Task):
         self.sim.physics_client.performCollisionDetection()
 
     def get_obs(self) -> np.ndarray:
-        """Return scene state and selected object identity."""
+        """Return object positions and selected object identity.
 
+        Destination information is provided separately through desired_goal.
+        This avoids inconsistency when HER relabels the desired goal.
+        """
         object_positions = np.concatenate([
             self.sim.get_base_position(name)
             for name in self.object_names
-        ])
-
-        destination_positions = np.concatenate([
-            self.sim.get_base_position(name)
-            for name in self.destination_names
         ])
 
         object_goal = np.zeros(
@@ -247,7 +245,6 @@ class MultiObjectPickAndPlaceTask(Task):
 
         return np.concatenate([
             object_positions,
-            destination_positions,
             object_goal,
         ]).astype(np.float32)
 
