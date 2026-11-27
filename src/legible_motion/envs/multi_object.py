@@ -43,6 +43,7 @@ class MultiObjectConfig:
     # Reward parameters
     reward_type: str = "dense"
     distance_threshold: float = 0.05
+    terminate_on_distance_success: bool = True
 
 
 class MultiObjectPickAndPlaceTask(Task):
@@ -228,25 +229,16 @@ class MultiObjectPickAndPlaceTask(Task):
         self.sim.physics_client.performCollisionDetection()
 
     def get_obs(self) -> np.ndarray:
-        """Return object positions and selected object identity.
+        """Return no additional task observation.
 
-        Destination information is provided separately through desired_goal.
-        This avoids inconsistency when HER relabels the desired goal.
+        The robot state is supplied by Panda's observation. The selected
+        object's position and selected destination are exposed separately
+        through achieved_goal and desired_goal, respectively.
+
+        All objects and destinations remain in the simulation; their
+        positions are simply not appended to the policy observation.
         """
-        object_positions = np.concatenate([
-            self.sim.get_base_position(name)
-            for name in self.object_names
-        ])
-
-        object_goal = np.zeros(
-            self.config.num_objects, dtype=np.float32
-        )
-        object_goal[self.goal_object_idx] = 1.0
-
-        return np.concatenate([
-            object_positions,
-            object_goal,
-        ]).astype(np.float32)
+        return np.empty((0,), dtype=np.float32)
 
     def get_achieved_goal(self) -> np.ndarray:
         return np.asarray(
@@ -363,7 +355,7 @@ class MultiObjectPickAndPlaceTask(Task):
             and angular_speed <= self.config.angular_velocity_threshold
         )
 
-    def is_success(self, achieved_goal, desired_goal):
+    def is_success_old(self, achieved_goal, desired_goal):
         """Require stable, physically valid placement for N steps."""
         physics = self.sim.physics_client
 
@@ -397,6 +389,26 @@ class MultiObjectPickAndPlaceTask(Task):
         return np.array(
             self._success_streak
             >= self.config.success_stability_steps,
+            dtype=bool,
+        )
+        
+    def is_success(self, achieved_goal, desired_goal):
+        """Distance-based termination, optionally disabled for diagnostics.
+
+        The default preserves the original Panda Gym training behavior.
+        Diagnostic rollouts can disable this so carrying an object near the
+        target does not terminate an episode before physical release.
+        """
+        if not self.config.terminate_on_distance_success:
+            achieved = np.asarray(achieved_goal)
+            return np.zeros(achieved.shape[:-1], dtype=bool)
+
+        distance = np.linalg.norm(
+            np.asarray(achieved_goal) - np.asarray(desired_goal),
+            axis=-1,
+        )
+        return np.asarray(
+            distance < self.config.distance_threshold,
             dtype=bool,
         )
 

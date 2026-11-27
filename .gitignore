@@ -13,12 +13,17 @@ venv/
 .vscode/
 .idea/
 
+# Diagnosis scripts
+scripts/diagnostics/
+src/legible_motion/exploration
+
 # Experiment outputs
 artifacts/*
 !artifacts/.gitkeep
 runs/
 logs/
 tensorboard/
+*.log
 
 # OS
 .DS_Store
