@@ -86,7 +86,8 @@ The current observation semantics appears to be more stable.
 
 The current standard TQC+HER experiment reached approximately **90% success with mean reward -3.639 +/- 9.134  after ~600k steps**.
 
-For comparison, the default PandaGym PickAndPlace baseline reached approximately **30% success with mean reward -37.540 +/- 19.862 after 1M steps** in a separate experiment. The reason for this difference is not yet established.
+For comparison, the default PandaGym PickAndPlace baseline reached approximately **30% success with mean reward -37.540 +/- 19.862 after 1M steps** in a separate experiment. 
+The reason for this difference is most likely the difference in the reward type, since the default PandaGym baseline uses a sparse reward.
 
 
 <table>
