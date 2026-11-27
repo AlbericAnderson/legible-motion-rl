@@ -7,6 +7,7 @@ from pathlib import Path
 
 import imageio.v2 as imageio
 
+import gymnasium as gym
 import numpy as np
 from sb3_contrib import TQC
 from stable_baselines3.common.callbacks import (
@@ -27,6 +28,19 @@ from legible_motion.envs.multi_object import (
     MultiObjectConfig,
     MultiObjectPickAndPlaceEnv,
 )
+
+
+class TerminalFrameCapture(gym.Wrapper):
+    """Capture the terminal image before DummyVecEnv automatically resets."""
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        if terminated or truncated:
+            info = dict(info)
+            frame = self.env.render()
+            if frame is not None:
+                info["terminal_frame"] = np.asarray(frame, dtype=np.uint8).copy()
+        return observation, reward, terminated, truncated, info
 
 
 def parse_args():
@@ -126,6 +140,7 @@ def make_env(
             config=config,
             render_mode=render_mode,
         )
+        env = TerminalFrameCapture(env)
         return Monitor(
             env,
             filename=str(monitor_path),
@@ -136,7 +151,7 @@ def make_env(
 
 
 def record_evaluation_video(model, eval_env, video_path: Path, max_steps: int):
-    """Record one deterministic evaluation episode from the RGB-array eval env."""
+    """Record one deterministic episode without including the next reset scene."""
     frames = []
     obs = eval_env.reset()
 
@@ -144,22 +159,25 @@ def record_evaluation_video(model, eval_env, video_path: Path, max_steps: int):
     if frame is not None:
         if isinstance(frame, (list, tuple)):
             frame = frame[0]
-        frames.append(np.asarray(frame, dtype=np.uint8))
+        frames.append(np.asarray(frame, dtype=np.uint8).copy())
 
     for _ in range(max_steps):
         action, _ = model.predict(obs, deterministic=True)
-        obs, _, dones, _ = eval_env.step(action)
+        obs, _, dones, infos = eval_env.step(action)
 
-        # VecEnv auto-resets after a terminal step. Do not append that reset
-        # scene as the final frame of the episode being recorded.
-        if bool(np.asarray(dones).reshape(-1)[0]):
+        done = bool(np.asarray(dones).reshape(-1)[0])
+        if done:
+            # Captured inside the environment before DummyVecEnv auto-reset.
+            terminal_frame = infos[0].get("terminal_frame")
+            if terminal_frame is not None:
+                frames.append(np.asarray(terminal_frame, dtype=np.uint8).copy())
             break
 
         frame = eval_env.render()
         if frame is not None:
             if isinstance(frame, (list, tuple)):
                 frame = frame[0]
-            frames.append(np.asarray(frame, dtype=np.uint8))
+            frames.append(np.asarray(frame, dtype=np.uint8).copy())
 
     if not frames:
         raise RuntimeError(
@@ -170,7 +188,6 @@ def record_evaluation_video(model, eval_env, video_path: Path, max_steps: int):
     video_path.parent.mkdir(parents=True, exist_ok=True)
     imageio.mimsave(video_path, frames, fps=25, macro_block_size=1)
     print(f"Saved evaluation video: {video_path}")
-
 
 class SuccessRateEvalCallback(BaseCallback):
     """Evaluate deterministic policy and save the best model/normalization."""
@@ -193,6 +210,28 @@ class SuccessRateEvalCallback(BaseCallback):
         self.best_success_rate = -1.0
         self.best_mean_reward = -np.inf
         self.metrics_path = run_dir / "evaluation_metrics.csv"
+
+        # Preserve the historical best when continuing an existing run.
+        if self.metrics_path.is_file():
+            try:
+                with self.metrics_path.open(newline="") as file:
+                    rows = list(csv.DictReader(file))
+                if rows:
+                    best_row = max(
+                        rows,
+                        key=lambda row: (
+                            float(row["success_rate"]),
+                            float(row["mean_reward"]),
+                        ),
+                    )
+                    self.best_success_rate = float(best_row["success_rate"])
+                    self.best_mean_reward = float(best_row["mean_reward"])
+            except (KeyError, ValueError, OSError):
+                print(
+                    "Warning: could not recover the previous best evaluation "
+                    "from evaluation_metrics.csv; the next evaluation may "
+                    "replace best_evaluation.mp4."
+                )
 
     def _on_step(self) -> bool:
         if self.n_calls % self.eval_freq != 0:
@@ -538,6 +577,21 @@ def main():
             "Saving an interruption checkpoint..."
         )
         save_training_state(interrupted_stem)
+
+        # Preserve a video of the latest policy when stopping manually.
+        try:
+            sync_envs_normalization(train_env, eval_env)
+            eval_env.training = False
+            eval_env.norm_reward = False
+            record_evaluation_video(
+                model,
+                eval_env,
+                run_dir / "videos" / "last_evaluation.mp4",
+                args.max_episode_steps,
+            )
+        except Exception as video_error:
+            print(f"Warning: could not save last evaluation video: {video_error}")
+
         print(
             "\nTraining interrupted cleanly. Resume with --resume-from "
             f"{run_dir / (interrupted_stem + '.zip')}"
