@@ -44,10 +44,10 @@ FSM-generated episodes illustrating the multi-object environment:
 <table>
   <tr>
     <td width="50%" align="center">
-      <video src="assets/replays/fsm_episode_1.mp4" width="100%" controls></video>
+      <img src="assets/replays/fsm_episode_1.gif" width="100%">
     </td>
     <td width="50%" align="center">
-      <video src="assets/replays/fsm_episode_2.mp4" width="100%" controls></video>
+      <img src="assets/replays/fsm_episode_2.gif" width="100%">
     </td>
   </tr>
 </table>
@@ -71,10 +71,10 @@ caused a *runaway* effect in which the policy learned to always move far away fr
 <table>
   <tr>
     <td width="50%" align="center">
-      <video src="assets/replays/runaway_episode_1.mp4" width="100%" controls></video>
+      <img src="assets/replays/runaway_episode_1.gif" width="100%">
     </td>
     <td width="50%" align="center">
-      <video src="assets/replays/runaway_episode_2.mp4" width="100%" controls></video>
+      <img src="assets/replays/runaway_episode_2.gif" width="100%">
     </td>
   </tr>
 </table>
@@ -92,12 +92,12 @@ For comparison, the default PandaGym PickAndPlace baseline reached approximately
 <table>
   <tr>
     <td width="50%" align="center">
-      <video src="assets/replays/600k_multi_object_tqc_her.mp4" width="100%" controls></video>
+      <img src="assets/replays/600k_multi_object_tqc_her.gif" width="100%">
       <br>
       <b>TQC-HER in Multi-Object Environment (~600k steps)</b>
     </td>
     <td width="50%" align="center">
-      <video src="assets/replays/1M_panda_gym_tqc_her.mp4" width="100%" controls></video>
+      <img src="assets/replays/1M_panda_gym_tqc_her.gif" width="100%">
       <br>
       <b>TQC-HER in panda-gym pick-and-place-v3 (~1M steps)</b>
     </td>
